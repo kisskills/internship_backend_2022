@@ -1,0 +1,5 @@
+---
+storage:
+  postgres: postgres://user:password@localhost/service
+server:
+  port: 8080

@@ -1,13 +1,16 @@
-FROM golang:latest
+FROM golang:latest as builder
 
 WORKDIR /app
+ENV CGO_ENABLED=0
+COPY . .
 
-COPY go.mod go.sum ./
+RUN go build -o . cmd/service/main.go
 
-RUN go mod download
+FROM alpine:latest
 
-RUN go build -o main .
+COPY --from=builder /app /app
 
 EXPOSE 8080
+RUN apk --no-cache add ca-certificates
 
-CMD ["./main"]
+ENTRYPOINT ["app/main"]
