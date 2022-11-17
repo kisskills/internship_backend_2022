@@ -152,7 +152,7 @@ func (s *Storage) Close() {
 }
 
 // мы прокидываем функцию, принимающую обьект транзакции
-// функция обертки в транзакцию
+// функция обертки в  одну транзакцию
 func (s *Storage) tx(ctx context.Context, fn func(tx pgx.Tx) error) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
