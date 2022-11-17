@@ -1,6 +1,9 @@
 package main
 
-import "service/internal/application"
+import (
+	"flag"
+	"service/internal/application"
+)
 
 // @title Balance Server API
 // @version 1.0
@@ -8,13 +11,14 @@ import "service/internal/application"
 
 // @host
 
-const (
-	path = "deployment/service.yml"
-)
-
 func main() {
+	var confPath string
+
+	flag.StringVar(&confPath, "config", "", "yaml config file")
+	flag.Parse()
+
 	app := application.Application{}
-	app.Build(path)
+	app.Build(confPath)
 
 	app.Run()
 }

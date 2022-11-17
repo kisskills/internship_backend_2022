@@ -10,4 +10,5 @@ type BalanceService interface {
 	CreditBalance(ctx context.Context, balance *entities.Balance) error
 	ReserveFromBalance(ctx context.Context, operation *entities.Operation) error
 	CommitReserve(ctx context.Context, operation *entities.Operation) error
+	RollbackReserve(ctx context.Context, operation *entities.Operation) error
 }

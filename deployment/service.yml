@@ -1,5 +1,5 @@
 ---
 storage:
-  postgres: postgres://user:password@localhost/service
+  postgres: postgres://user:password@database:5432/service
 server:
   port: 8080

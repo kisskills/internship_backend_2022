@@ -37,8 +37,11 @@ func NewServer(log *zap.SugaredLogger, svc BalanceService, port int) (*Server, e
 	basePath := "/api/v1"
 
 	router.Route(basePath, func(r chi.Router) {
-		r.Get(fmt.Sprintf("/{%s}", userIDURLParam), server.GetUserBalance)
-		r.Post(fmt.Sprintf("/{%s}", userIDURLParam), server.CreditBalance)
+		r.Get(fmt.Sprintf("/balance/{%s}", userIDURLParam), server.GetUserBalance)
+		r.Post(fmt.Sprintf("/balance/{%s}/credit", userIDURLParam), server.CreditBalance)
+		r.Post(fmt.Sprintf("/balance/{%s}/reserve", userIDURLParam), server.ReserveFromBalance)
+		r.Post(fmt.Sprintf("/balance/{%s}/commit", userIDURLParam), server.CommitReserve)
+		r.Post(fmt.Sprintf("/balance/{%s}/rollback", userIDURLParam), server.RollbackReserve)
 	})
 
 	return server, nil
@@ -106,6 +109,202 @@ func (s *Server) CreditBalance(w http.ResponseWriter, r *http.Request) {
 	balance := entities.NewBalance(userID, entities.Currency(request.Currency))
 
 	err := s.svc.CreditBalance(ctx, balance)
+	if err != nil {
+		s.log.Error(err)
+		s.writeError(w, entities.ErrInternal, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct{}{})
+}
+
+func (s *Server) ReserveFromBalance(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID := chi.URLParam(r, userIDURLParam)
+	if userID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty operation id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	request := &dto.ReserveRequest{}
+
+	json.NewDecoder(r.Body).Decode(request)
+
+	if request.Currency <= 0 {
+		err := errors.WithMessage(entities.ErrInvalidParam, "invalid currency")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if request.ServiceID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty service id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if request.OrderID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty order id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	operation := entities.NewOperation(
+		userID,
+		request.ServiceID,
+		request.OrderID,
+		entities.Debit,
+		entities.Reserve,
+		entities.Currency(request.Currency),
+	)
+
+	err := s.svc.ReserveFromBalance(ctx, operation)
+	if errors.Is(err, entities.ErrNotFound) {
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		s.log.Error(err)
+		s.writeError(w, entities.ErrInternal, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct{}{})
+}
+
+func (s *Server) CommitReserve(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID := chi.URLParam(r, userIDURLParam)
+	if userID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty operation id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	request := &dto.CommitReserveRequest{}
+
+	json.NewDecoder(r.Body).Decode(request)
+
+	if request.Currency <= 0 {
+		err := errors.WithMessage(entities.ErrInvalidParam, "invalid currency")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if request.ServiceID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty service id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if request.OrderID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty order id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	operation := entities.NewOperation(
+		userID,
+		request.ServiceID,
+		request.OrderID,
+		entities.Debit,
+		entities.Commit,
+		entities.Currency(request.Currency),
+	)
+
+	err := s.svc.CommitReserve(ctx, operation)
+	if errors.Is(err, entities.ErrInvalidParam) {
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, entities.ErrNotFound) {
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		s.log.Error(err)
+		s.writeError(w, entities.ErrInternal, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct{}{})
+}
+
+func (s *Server) RollbackReserve(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID := chi.URLParam(r, userIDURLParam)
+	if userID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty operation id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	request := &dto.CommitReserveRequest{}
+
+	json.NewDecoder(r.Body).Decode(request)
+
+	if request.Currency <= 0 {
+		err := errors.WithMessage(entities.ErrInvalidParam, "invalid currency")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if request.ServiceID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty service id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if request.OrderID == "" {
+		err := errors.WithMessage(entities.ErrInvalidParam, "empty order id")
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	operation := entities.NewOperation(
+		userID,
+		request.ServiceID,
+		request.OrderID,
+		entities.Debit,
+		entities.Rollback,
+		entities.Currency(request.Currency),
+	)
+
+	err := s.svc.RollbackReserve(ctx, operation)
+	if errors.Is(err, entities.ErrInvalidParam) {
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, entities.ErrNotFound) {
+		s.log.Error(err)
+		s.writeError(w, err, http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		s.log.Error(err)
 		s.writeError(w, entities.ErrInternal, http.StatusInternalServerError)

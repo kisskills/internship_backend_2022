@@ -10,7 +10,9 @@ FROM alpine:latest
 
 COPY --from=builder /app /app
 
+WORKDIR /app
+
 EXPOSE 8080
 RUN apk --no-cache add ca-certificates
 
-ENTRYPOINT ["app/main"]
+ENTRYPOINT ["./main"]

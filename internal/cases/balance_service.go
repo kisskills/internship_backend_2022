@@ -45,6 +45,7 @@ func (s *BalanceService) CreditBalance(ctx context.Context, balance *entities.Ba
 		"",
 		"",
 		entities.Credit,
+		entities.Commit,
 		balance.Currency(),
 	)
 
@@ -68,7 +69,41 @@ func (s *BalanceService) ReserveFromBalance(ctx context.Context, operation *enti
 }
 
 func (s *BalanceService) CommitReserve(ctx context.Context, operation *entities.Operation) error {
-	err := s.storage.Commit(ctx, operation)
+	op, err := s.storage.GetOperation(ctx, operation.OrderID())
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	if err == entities.ErrNotFound {
+		return errors.WithMessage(err, "operation not found")
+	}
+	if op.OperationStatus() != entities.Reserve {
+		return errors.WithMessage(entities.ErrInvalidParam, "operation completed")
+	}
+
+	err = s.storage.Commit(ctx, operation)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+
+	return nil
+}
+
+func (s *BalanceService) RollbackReserve(ctx context.Context, operation *entities.Operation) error {
+	op, err := s.storage.GetOperation(ctx, operation.OrderID())
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	if err == entities.ErrNotFound {
+		return errors.WithMessage(err, "operation not found")
+	}
+	if op.OperationStatus() != entities.Reserve {
+		return errors.WithMessage(entities.ErrInvalidParam, "operation completed")
+	}
+
+	err = s.storage.Rollback(ctx, operation)
 	if err != nil {
 		s.log.Error(err)
 		return err

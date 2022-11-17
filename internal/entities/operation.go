@@ -1,40 +1,45 @@
 package entities
 
-import (
-	"github.com/google/uuid"
-)
-
 type OperationType int
+type Status int
 
 const (
 	Credit OperationType = iota + 1
-	Reserve
+	Debit
+)
+
+const (
+	Reserve Status = iota + 1
+	Rollback
 	Commit
 )
 
-func NewOperation(userID string, serviceID string, orderID string, operationType OperationType, value Currency) *Operation {
-	// id генерим не бдшкой, потому что это бизнес-логика и мы не отдаем ее на откуп бд
+func NewOperation(
+	userID string,
+	serviceID string,
+	orderID string,
+	operationType OperationType,
+	status Status,
+	value Currency,
+) *Operation {
+
 	return &Operation{
-		id:            uuid.New().String(),
 		userID:        userID,
 		serviceID:     serviceID,
 		operationType: operationType,
+		status:        status,
 		orderID:       orderID,
 		value:         value,
 	}
 }
 
 type Operation struct {
-	id            string
 	userID        string
 	serviceID     string
 	operationType OperationType
+	status        Status
 	orderID       string
 	value         Currency
-}
-
-func (o *Operation) ID() string {
-	return o.id
 }
 
 func (o *Operation) UserID() string {
@@ -51,6 +56,10 @@ func (o *Operation) OrderID() string {
 
 func (o *Operation) OperationType() OperationType {
 	return o.operationType
+}
+
+func (o *Operation) OperationStatus() Status {
+	return o.status
 }
 
 func (o *Operation) Value() Currency {

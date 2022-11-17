@@ -19,9 +19,14 @@ var (
 	_ cases.Storage = (*Storage)(nil)
 )
 
+var (
+	_ cases.Storage = (*Storage)(nil)
+)
+
 type Storage struct {
-	log *zap.SugaredLogger
-	db  *pgxpool.Pool
+	log    *zap.SugaredLogger
+	cancel context.CancelFunc
+	db     *pgxpool.Pool
 }
 
 // создаю контекст, кторый отменится через 5 секунд...
@@ -36,8 +41,12 @@ func NewStorage(log *zap.SugaredLogger, dsn string) (*Storage, error) {
 		return nil, errors.WithMessage(entities.ErrInvalidParam, "empty dsn")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), connTimeout)
-	defer cancel()
+	st := &Storage{
+		log: log,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	st.cancel = cancel
 
 	conn, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -49,10 +58,9 @@ func NewStorage(log *zap.SugaredLogger, dsn string) (*Storage, error) {
 		return nil, err
 	}
 
-	return &Storage{
-		log: log,
-		db:  conn,
-	}, nil
+	st.db = conn
+
+	return st, nil
 }
 
 func (s *Storage) GetBalance(ctx context.Context, userID string) (*entities.Balance, error) {
@@ -66,15 +74,56 @@ func (s *Storage) GetBalance(ctx context.Context, userID string) (*entities.Bala
 	row := s.db.QueryRow(ctx, query, &userID)
 	err := row.Scan(&currency)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, entities.ErrNotFound
+		err = errors.WithMessage(entities.ErrNotFound, "balance not found")
+		s.log.Error(err)
+		return nil, err
 	}
 	if err != nil {
+		s.log.Error(err)
 		return nil, errors.WithMessage(entities.ErrInternal, err.Error())
 	}
 
 	balance := entities.NewBalance(userID, entities.Currency(currency))
 
 	return balance, nil
+}
+
+func (s *Storage) GetOperation(ctx context.Context, orderID string) (*entities.Operation, error) {
+	query := `SELECT user_id, service_id, operation_type, 
+       operations_status, value 
+	from avito.operations 
+	WHERE order_id=$1`
+
+	var (
+		userID          string
+		serviceID       string
+		operationType   int
+		operationStatus int
+		value           int
+	)
+
+	row := s.db.QueryRow(ctx, query, &orderID)
+	err := row.Scan(&userID, &serviceID, &operationType, &operationStatus, &value)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = errors.WithMessage(entities.ErrNotFound, "operation not found")
+		s.log.Error(err)
+		return nil, err
+	}
+	if err != nil {
+		s.log.Error(err)
+		return nil, errors.WithMessage(entities.ErrInternal, err.Error())
+	}
+
+	operation := entities.NewOperation(
+		userID,
+		serviceID,
+		orderID,
+		entities.OperationType(operationType),
+		entities.Status(operationStatus),
+		entities.Currency(value),
+	)
+
+	return operation, nil
 }
 
 func (s *Storage) CreateOrUpdateBalance(
@@ -85,11 +134,13 @@ func (s *Storage) CreateOrUpdateBalance(
 	if err := s.tx(ctx, func(tx pgx.Tx) error {
 		err := s.createOrUpdateBalance(ctx, tx, balance)
 		if err != nil {
+			s.log.Error(err)
 			return err
 		}
 
-		err = s.createOperation(ctx, tx, operation)
+		err = s.createOrUpdateOperation(ctx, tx, operation)
 		if err != nil {
+			s.log.Error(err)
 			return err
 		}
 
@@ -103,34 +154,40 @@ func (s *Storage) CreateOrUpdateBalance(
 
 func (s *Storage) createOrUpdateBalance(ctx context.Context, tx pgx.Tx, balance *entities.Balance) error {
 	query := `INSERT INTO avito.balances (user_id, currency, created_at, updated_at)
-	VALUES ($1, $2, NOW(), NOW())
-	ON CONFLICT (user_id) DO UPDATE 
-	SET currency   = balances.currency + EXCLUDED.currency,
-		updated_at = EXCLUDED.updated_at`
+		VALUES ($1, $2, NOW(), NOW())
+		ON CONFLICT (user_id) DO UPDATE 
+		SET currency   = balances.currency + EXCLUDED.currency,
+			updated_at = EXCLUDED.updated_at`
 
 	_, err := tx.Exec(ctx, query, balance.UserID(), balance.Currency())
 	if err != nil {
+		s.log.Error(err)
 		return err
 	}
 
 	return nil
 }
 
-func (s *Storage) createOperation(ctx context.Context, tx pgx.Tx, operation *entities.Operation) error {
-	query := `INSERT INTO avito.operations (id, user_id, service_id, order_id, operation_type, value, created_at, updated_at)
-	VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`
+func (s *Storage) createOrUpdateOperation(ctx context.Context, tx pgx.Tx, operation *entities.Operation) error {
+	query := `INSERT INTO avito.operations 
+    (user_id, service_id, order_id, operation_type, operations_status, value, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) 
+	ON CONFLICT (order_id) DO UPDATE 
+	SET operations_status = EXCLUDED.operations_status,
+		updated_at = EXCLUDED.updated_at`
 
 	params := []interface{}{
-		operation.ID(),
 		operation.UserID(),
 		operation.ServiceID(),
 		operation.OrderID(),
 		operation.OperationType(),
+		operation.OperationStatus(),
 		operation.Value(),
 	}
 
 	_, err := tx.Exec(ctx, query, params...)
 	if err != nil {
+		s.log.Error(err)
 		return err
 	}
 
@@ -138,17 +195,98 @@ func (s *Storage) createOperation(ctx context.Context, tx pgx.Tx, operation *ent
 }
 
 func (s *Storage) Reserve(ctx context.Context, operation *entities.Operation) error {
-	//TODO implement me
-	panic("implement me")
+	queryBalance := `UPDATE avito.balances
+			SET currency = currency - $1,
+				reserve  = reserve + $1
+				WHERE user_id = $2`
+
+	if err := s.tx(ctx, func(tx pgx.Tx) error {
+		res, err := tx.Exec(ctx, queryBalance, operation.Value(), operation.UserID())
+		if err != nil {
+			s.log.Error(err)
+			return err
+		}
+
+		if res.RowsAffected() == 0 {
+			err = errors.WithMessage(entities.ErrNotFound, "balance not found")
+			s.log.Error(err)
+			return err
+		}
+
+		err = s.createOrUpdateOperation(ctx, tx, operation)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Storage) Commit(ctx context.Context, operation *entities.Operation) error {
-	//TODO implement me
-	panic("implement me")
+	queryBalance := `UPDATE avito.balances
+			SET reserve = reserve - $1
+				WHERE user_id = $2`
+
+	if err := s.tx(ctx, func(tx pgx.Tx) error {
+		res, err := tx.Exec(ctx, queryBalance, operation.Value(), operation.UserID())
+		if err != nil {
+			return err
+		}
+
+		if res.RowsAffected() == 0 {
+			err = errors.WithMessage(entities.ErrNotFound, "balance not found")
+			s.log.Error(err)
+			return err
+		}
+
+		err = s.createOrUpdateOperation(ctx, tx, operation)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Storage) Rollback(ctx context.Context, operation *entities.Operation) error {
+	queryBalance := `UPDATE avito.balances
+			SET currency = currency + $1,
+			    reserve  = reserve - $1
+				WHERE user_id = $2`
+
+	if err := s.tx(ctx, func(tx pgx.Tx) error {
+		res, err := tx.Exec(ctx, queryBalance, operation.Value(), operation.UserID())
+		if err != nil {
+			return err
+		}
+
+		if res.RowsAffected() == 0 {
+			err = errors.WithMessage(entities.ErrNotFound, "balance not found")
+			s.log.Error(err)
+			return err
+		}
+
+		err = s.createOrUpdateOperation(ctx, tx, operation)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Storage) Close() {
 	s.db.Close()
+	s.cancel()
 }
 
 // мы прокидываем функцию, принимающую обьект транзакции
