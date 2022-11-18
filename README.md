@@ -27,47 +27,87 @@
 4. Метод получения баланса пользователя. Принимает id пользователя.
 
 **Дополнительно**
-- Добавлен метод rollback, с помощью которого можно удалить неподтвержденную операцию (деньги вернутся на баланс пользователя)
+- Получение списка транзакций с комментариями
 - Добавленна обработка ошибок с возвратом соответствующего типа и json 
 
 ---
 **Запуск**
 
 После клонирования репозитория достаточно выполнить `make` в папке проекта
-> Для завершения: `make clean`
-> Для перезапуска: `make restart`
-
+> Для завершения: `make clean`.
+> Для перезапуска: `make restart`.
+> Для генерации swagger `make generate_swagger`.
 ---
 **Запросы**
 
 - *Получение баланса пользователя*
 ```
-curl http://localhost:8080/api/v1/balance/{user_id}
+curl -X 'GET' \
+  'http://localhost:8080/api/v1/balances/user1' \
+  -H 'accept: application/json'
 ```
 
 - *Пополнение баланса пользователя (создание нового с нужным балансом)*
 ```
-curl  http://localhost:8080/api/v1/balance/{user_id}/credit -H 'Content-Type: application/json' -d '{"currency" : 0}'
+curl -X 'POST' \
+  'http://localhost:8080/api/v1/balances/{user_id}/credit' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "currency": 30
+}'
 ```
 
 - *Резервирование средств пользователя*
 ```
-curl http://localhost:8080/api/v1/balance/{user_id}/reserve -H 'Content-Type: application/json' -d '{"service_id": "1","order_id": "1","currency": 0}' 
+curl -X 'POST' \
+  'http://localhost:8080/api/v1/balances/{user_id}/reserve' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "currency": 50,
+  "order_id": "1",
+  "service_id": "shop"
+}'
 ```
 
 - *Признание выручки*
 ```
-curl http://localhost:8080/api/v1/balance/{user_id}/commit -H 'Content-Type: application/json' -d '{"service_id": "string","order_id": "string","currency": 0}'
+curl -X 'POST' \
+  'http://localhost:8080/api/v1/balances/{user_id}/commit' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "currency": 50,
+  "order_id": "1",
+  "service_id": "shop"
+}'
 ```
 
-- *Возврат средств*
+- *Составление отчета*
+
+Просто все операции по пользователю:
 ```
-curl http://localhost:8080/api/v1/balance/{user_id}/rollback -H 'Content-Type: application/json' -d '{"service_id": "string","order_id": "string","currency": 0}'
+curl -X 'GET' \
+  'http://localhost:8080/api/v1/balances/{user_id}/operations' \
+  -H 'accept: application/json'
+```
+Операции с доп. параметрами (limit - кол-во выведенных, offset - отступ от первой записи, order_by - сортировка по стоимости/времени, desc - порядок)
+```
+curl -X 'GET' \
+  'http://localhost:8080/api/v1/balances/{user_id}/operations?limit=10&offset=0&order_by=date&desc=true' \
+  -H 'accept: application/json'
 ```
 
 ---
 **Комментарии**
 
-1. Так как резерв баланса не используется ни в какой сторонней бизнес-логике, было принято решение вынести его из сущности и хранить только в базе данных
-2. Формат, в котором хранятся деньги на данный момент имеет тип int, обернутый в структурку. Планируется его замена на decimal или же на два int`а, которые будут хранить условные рубли и копейки
+1. Так как резерв баланса не используется ни в какой сторонней бизнес-логике, было принято решение вынести его из сущности и хранить только в базе данных.
+2. Формат, в котором хранятся деньги на данный момент имеет тип int, обернутый в структурку. Предполагается, что суммы изначально указаны в копейках.Возможна его замена на decimal или же на два int`а, которые будут хранить условные рубли и копейки
 
+**Update**
+1. Резерв перемещен в таблицу с операциями
+2. Теперь можно списать резерв с операции частично
+3. Добавлен swagger. Swager UI по адресу `http://localhost:8080/swagger/`
+4. Убран метод rollback, так как его реализация значительно усложняется в связи с изменениями в резерве и подтверждении выручки
+5. Диаграмма классов поменялась

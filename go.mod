@@ -3,8 +3,10 @@ module service
 go 1.19
 
 require (
+	github.com/flowchartsman/swaggerui v0.0.0-20221017034628-909ed4f3701b
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/google/uuid v1.1.2
+	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v5 v5.1.0
 	github.com/knadh/koanf v1.4.4
 	github.com/pkg/errors v0.9.1

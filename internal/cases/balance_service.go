@@ -2,9 +2,11 @@ package cases
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"service/internal/entities"
+	"time"
 )
 
 type BalanceService struct {
@@ -27,6 +29,25 @@ func NewBalanceService(log *zap.SugaredLogger, storage Storage) (*BalanceService
 	}, nil
 }
 
+func (s *BalanceService) CreditBalance(ctx context.Context, userID string, value entities.Currency) error {
+	operation := entities.NewOperation(
+		userID,
+		entities.DefaultCreditServiceID,
+		uuid.New().String(),
+		entities.Credit,
+		value,
+		time.Time{},
+	)
+
+	err := s.storage.CreateOrUpdateBalance(ctx, operation)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+
+	return nil
+}
+
 func (s *BalanceService) GetUserBalance(ctx context.Context, userID string) (*entities.Balance, error) {
 	log := s.log.With("user_id", userID)
 
@@ -39,17 +60,16 @@ func (s *BalanceService) GetUserBalance(ctx context.Context, userID string) (*en
 	return balance, nil
 }
 
-func (s *BalanceService) CreditBalance(ctx context.Context, balance *entities.Balance) error {
-	operation := entities.NewOperation(
-		balance.UserID(),
-		"",
-		"",
-		entities.Credit,
-		entities.Commit,
-		balance.Currency(),
-	)
+func (s *BalanceService) ReserveFromBalance(
+	ctx context.Context,
+	userID string,
+	serviceID string,
+	orderID string,
+	value entities.Currency,
+) error {
+	operation := entities.NewOperation(userID, serviceID, orderID, entities.Debit, value, time.Time{})
 
-	err := s.storage.CreateOrUpdateBalance(ctx, balance, operation)
+	err := s.storage.CreateOperation(ctx, operation)
 	if err != nil {
 		s.log.Error(err)
 		return err
@@ -58,30 +78,30 @@ func (s *BalanceService) CreditBalance(ctx context.Context, balance *entities.Ba
 	return nil
 }
 
-func (s *BalanceService) ReserveFromBalance(ctx context.Context, operation *entities.Operation) error {
-	err := s.storage.Reserve(ctx, operation)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-
-	return nil
-}
-
-func (s *BalanceService) CommitReserve(ctx context.Context, operation *entities.Operation) error {
-	op, err := s.storage.GetOperation(ctx, operation.OrderID())
+func (s *BalanceService) CommitReserve(
+	ctx context.Context,
+	userID string,
+	serviceID string,
+	orderID string,
+	value entities.Currency,
+) error {
+	op, err := s.storage.GetOperation(ctx, userID, orderID, serviceID)
 	if err != nil {
 		s.log.Error(err)
 		return err
 	}
 	if err == entities.ErrNotFound {
+		s.log.Error(err)
 		return errors.WithMessage(err, "operation not found")
 	}
-	if op.OperationStatus() != entities.Reserve {
-		return errors.WithMessage(entities.ErrInvalidParam, "operation completed")
+	if op.Value() == 0 {
+		s.log.Error(err)
+		return errors.WithMessage(entities.ErrInvalidParam, "operation already committed")
 	}
 
-	err = s.storage.Commit(ctx, operation)
+	operation := entities.NewOperation(userID, serviceID, orderID, entities.Debit, value, time.Time{})
+
+	err = s.storage.UpdateOperationReserve(ctx, operation)
 	if err != nil {
 		s.log.Error(err)
 		return err
@@ -90,24 +110,17 @@ func (s *BalanceService) CommitReserve(ctx context.Context, operation *entities.
 	return nil
 }
 
-func (s *BalanceService) RollbackReserve(ctx context.Context, operation *entities.Operation) error {
-	op, err := s.storage.GetOperation(ctx, operation.OrderID())
+func (s *BalanceService) ListOperations(
+	ctx context.Context,
+	userID string,
+	limit, offset int,
+	sortBy string, desc bool,
+) ([]*entities.Operation, error) {
+	operations, err := s.storage.ListOperations(ctx, userID, limit, offset, sortBy, desc)
 	if err != nil {
 		s.log.Error(err)
-		return err
-	}
-	if err == entities.ErrNotFound {
-		return errors.WithMessage(err, "operation not found")
-	}
-	if op.OperationStatus() != entities.Reserve {
-		return errors.WithMessage(entities.ErrInvalidParam, "operation completed")
+		return nil, err
 	}
 
-	err = s.storage.Rollback(ctx, operation)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-
-	return nil
+	return operations, nil
 }

@@ -1,0 +1,294 @@
+basePath: /api/v1
+consumes:
+  - application/json
+definitions:
+  Balance:
+    description: Balance info
+    properties:
+      currency:
+        format: int64
+        type: integer
+        x-go-name: Currency
+      user_id:
+        type: string
+        x-go-name: UserID
+    type: object
+    x-go-package: service/pkg/dto
+  CommitReserveRequest:
+    description: CommitReserveRequest
+    properties:
+      currency:
+        format: int64
+        type: integer
+        x-go-name: Currency
+      order_id:
+        type: string
+        x-go-name: OrderID
+      service_id:
+        type: string
+        x-go-name: ServiceID
+    type: object
+    x-go-package: service/pkg/dto
+  CreditRequest:
+    description: CreditRequest
+    properties:
+      currency:
+        format: int64
+        type: integer
+        x-go-name: Currency
+    type: object
+    x-go-package: service/pkg/dto
+  ErrResponse:
+    description: ErrResponse
+    properties:
+      Message:
+        type: string
+    type: object
+    x-go-package: service/pkg/dto
+  Operation:
+    description: Operation
+    properties:
+      created_at:
+        format: date-time
+        type: string
+        x-go-name: CreatedAt
+      operation_type:
+        type: string
+        x-go-name: OperationType
+      order_id:
+        type: string
+        x-go-name: OrderID
+      service_id:
+        type: string
+        x-go-name: ServiceID
+      value:
+        format: int64
+        type: integer
+        x-go-name: Value
+    type: object
+    x-go-package: service/pkg/dto
+  ReserveRequest:
+    description: ReserveRequest
+    properties:
+      currency:
+        format: int64
+        type: integer
+        x-go-name: Currency
+      order_id:
+        type: string
+        x-go-name: OrderID
+      service_id:
+        type: string
+        x-go-name: ServiceID
+    type: object
+    x-go-package: service/pkg/dto
+host: localhost:8080
+info:
+  title: Balance service public API.
+  version: 0.0.1
+paths:
+  /balances/{user_id}:
+    get:
+      consumes:
+        - application/json
+      operationId: GetUserBalance
+      parameters:
+        - description: User id
+          in: path
+          name: user_id
+          required: true
+          type: string
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Success response
+          schema:
+            $ref: '#/definitions/Balance'
+        "400":
+          description: Bad response
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/ErrResponse'
+      summary: GetUserBalance returns user balance info
+      tags:
+        - public
+  /balances/{user_id}/commit:
+    post:
+      consumes:
+        - application/json
+      operationId: CommitReserve
+      parameters:
+        - description: User id
+          in: path
+          name: user_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/CommitReserveRequest'
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Success response
+        "400":
+          description: Bad response
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/ErrResponse'
+      summary: CommitReserve commit reserve
+      tags:
+        - public
+  /balances/{user_id}/credit:
+    post:
+      consumes:
+        - application/json
+      operationId: CreditBalance
+      parameters:
+        - description: User id
+          in: path
+          name: user_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/CreditRequest'
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Success response
+        "400":
+          description: Bad response
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/ErrResponse'
+      summary: CreditBalance credit value to user balance
+      tags:
+        - public
+  /balances/{user_id}/operations:
+    get:
+      consumes:
+        - application/json
+      operationId: ListOperations
+      parameters:
+        - description: User id
+          in: path
+          name: user_id
+          required: true
+          type: string
+        - description: Limit
+          in: query
+          name: limit
+          type: integer
+        - description: Offset
+          in: query
+          name: offset
+          type: integer
+        - description: Field order by. date or value
+          in: query
+          name: order_by
+          type: string
+        - description: Response in desc order
+          in: query
+          name: desc
+          type: boolean
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Success response
+        "400":
+          description: Bad response
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/ErrResponse'
+      summary: ListOperations list balance operations
+      tags:
+        - public
+  /balances/{user_id}/reserve:
+    post:
+      consumes:
+        - application/json
+      operationId: ReserveFromBalance
+      parameters:
+        - description: User id
+          in: path
+          name: user_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/ReserveRequest'
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Success response
+        "400":
+          description: Bad response
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/ErrResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/ErrResponse'
+      summary: ReserveFromBalance reserve value from user's balance
+      tags:
+        - public
+produces:
+  - application/json
+schemes:
+  - http
+swagger: "2.0"

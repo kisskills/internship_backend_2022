@@ -1,0 +1,433 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "title": "Balance service public API.",
+    "version": "0.0.1"
+  },
+  "host": "localhost:8080",
+  "basePath": "/api/v1",
+  "paths": {
+    "/balances/{user_id}": {
+      "get": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "public"
+        ],
+        "summary": "GetUserBalance returns user balance info",
+        "operationId": "GetUserBalance",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User id",
+            "name": "user_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success response",
+            "schema": {
+              "$ref": "#/definitions/Balance"
+            }
+          },
+          "400": {
+            "description": "Bad response",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          }
+        }
+      }
+    },
+    "/balances/{user_id}/commit": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "public"
+        ],
+        "summary": "CommitReserve commit reserve",
+        "operationId": "CommitReserve",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User id",
+            "name": "user_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CommitReserveRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success response"
+          },
+          "400": {
+            "description": "Bad response",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          }
+        }
+      }
+    },
+    "/balances/{user_id}/credit": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "public"
+        ],
+        "summary": "CreditBalance credit value to user balance",
+        "operationId": "CreditBalance",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User id",
+            "name": "user_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreditRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success response"
+          },
+          "400": {
+            "description": "Bad response",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          }
+        }
+      }
+    },
+    "/balances/{user_id}/operations": {
+      "get": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "public"
+        ],
+        "summary": "ListOperations list balance operations",
+        "operationId": "ListOperations",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User id",
+            "name": "user_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "description": "Limit",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Offset",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Field order by. date or value",
+            "name": "order_by",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Response in desc order",
+            "name": "desc",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success response"
+          },
+          "400": {
+            "description": "Bad response",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          }
+        }
+      }
+    },
+    "/balances/{user_id}/reserve": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "public"
+        ],
+        "summary": "ReserveFromBalance reserve value from user's balance",
+        "operationId": "ReserveFromBalance",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User id",
+            "name": "user_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReserveRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success response"
+          },
+          "400": {
+            "description": "Bad response",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "schema": {
+              "$ref": "#/definitions/ErrResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Balance": {
+      "description": "Balance info",
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Currency"
+        },
+        "user_id": {
+          "type": "string",
+          "x-go-name": "UserID"
+        }
+      },
+      "x-go-package": "service/pkg/dto"
+    },
+    "CommitReserveRequest": {
+      "description": "CommitReserveRequest",
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Currency"
+        },
+        "order_id": {
+          "type": "string",
+          "x-go-name": "OrderID"
+        },
+        "service_id": {
+          "type": "string",
+          "x-go-name": "ServiceID"
+        }
+      },
+      "x-go-package": "service/pkg/dto"
+    },
+    "CreditRequest": {
+      "description": "CreditRequest",
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Currency"
+        }
+      },
+      "x-go-package": "service/pkg/dto"
+    },
+    "ErrResponse": {
+      "description": "ErrResponse",
+      "type": "object",
+      "properties": {
+        "Message": {
+          "type": "string"
+        }
+      },
+      "x-go-package": "service/pkg/dto"
+    },
+    "Operation": {
+      "description": "Operation",
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "CreatedAt"
+        },
+        "operation_type": {
+          "type": "string",
+          "x-go-name": "OperationType"
+        },
+        "order_id": {
+          "type": "string",
+          "x-go-name": "OrderID"
+        },
+        "service_id": {
+          "type": "string",
+          "x-go-name": "ServiceID"
+        },
+        "value": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Value"
+        }
+      },
+      "x-go-package": "service/pkg/dto"
+    },
+    "ReserveRequest": {
+      "description": "ReserveRequest",
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Currency"
+        },
+        "order_id": {
+          "type": "string",
+          "x-go-name": "OrderID"
+        },
+        "service_id": {
+          "type": "string",
+          "x-go-name": "ServiceID"
+        }
+      },
+      "x-go-package": "service/pkg/dto"
+    }
+  }
+}
